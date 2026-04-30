@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Fishing Master</title>
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="icon" href="assets/images/logo.png" type="image/png">
+</head>
+<body>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <a href="index.html" class="topbar-brand">
+      <img src="assets/images/logo.png" alt="Logo">
+      <span>FishingMaster</span>
+    </a>
+    <div class="topbar-right">
+      <div class="topbar-user">
+        <span class="user-name" id="topbar-name">—</span>
+        <span class="user-role" id="topbar-role">—</span>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+
+    <!-- STATS ROW -->
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card active">
+        <div class="stat-label">🎣 Đang câu</div>
+        <div class="stat-value" id="stat-active">0</div>
+        <div class="stat-unit">ca đang hoạt động</div>
+      </div>
+      <div class="stat-card done">
+        <div class="stat-label">✅ Đã xong</div>
+        <div class="stat-value" id="stat-done">0</div>
+        <div class="stat-unit">ca hoàn thành hôm nay</div>
+      </div>
+      <div class="stat-card fish">
+        <div class="stat-label">🐟 Tổng cá câu</div>
+        <div class="stat-value" id="stat-fish">0</div>
+        <div class="stat-unit">kg hôm nay</div>
+      </div>
+      <div class="stat-card remain">
+        <div class="stat-label">🌊 Ước tính còn lại</div>
+        <div class="stat-value" id="stat-remain">500</div>
+        <div class="stat-unit">kg cá trong hồ</div>
+      </div>
+    </div>
+
+    <!-- GRID MENU -->
+    <h2 class="section-title"><span class="icon">📋</span> Menu quản lý</h2>
+    <div class="grid-menu">
+      <button class="menu-btn create" onclick="openModal('create-session')">
+        <div class="menu-icon">📝</div>
+        Tạo đơn câu
+      </button>
+      <button class="menu-btn product" onclick="openModal('add-product')">
+        <div class="menu-icon">🍜</div>
+        Thêm sản phẩm
+      </button>
+      <button class="menu-btn customer" onclick="showToast('Tính năng Khách hàng - Bước tiếp theo','success')">
+        <div class="menu-icon">👥</div>
+        Khách hàng
+      </button>
+      <button class="menu-btn report" onclick="window.location.href='report.html'">
+        <div class="menu-icon">📊</div>
+        Báo cáo
+      </button>
+      <button class="menu-btn fish-manage" onclick="openModal('manage-fish')">
+        <div class="menu-icon">🐟</div>
+        Quản lý cá
+      </button>
+    </div>
+
+    <!-- ACTIVE SESSIONS -->
+    <h2 class="section-title"><span class="icon">⏱️</span> Ca câu đang hoạt động</h2>
+    <div class="sessions-grid" id="sessions-grid">
+      <div class="empty-state" id="empty-sessions">
+        <div class="icon">🎣</div>
+        <p>Chưa có ca câu nào. Bấm <strong>"Tạo đơn câu"</strong> để bắt đầu!</p>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div class="leaderboard" id="leaderboard">
+      <div class="leaderboard-title">🏆 Bảng vàng — Top 5 cần thủ hôm nay</div>
+      <div id="leaderboard-list">
+        <div class="empty-state" style="padding:24px">
+          <p>Chưa có dữ liệu cần thủ hôm nay</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ====== MODAL: TẠO ĐƠN CÂU ====== -->
+  <div class="modal-overlay" id="modal-create-session">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📝 Tạo đơn câu mới</h2>
+        <button class="modal-close" onclick="closeModal('create-session')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên khách hàng *</label>
+          <input class="form-input" id="inp-customer-name" placeholder="Nhập tên khách..." required>
+        </div>
+        <div class="form-group">
+          <label>Số điện thoại</label>
+          <input class="form-input" id="inp-customer-phone" placeholder="0xxx xxx xxx" type="tel">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gói giờ câu *</label>
+            <select class="form-input" id="inp-time-package">
+              <option value="60">1 giờ</option>
+              <option value="120" selected>2 giờ</option>
+              <option value="180">3 giờ</option>
+              <option value="240">4 giờ</option>
+              <option value="300">5 giờ</option>
+              <option value="480">8 giờ (cả ngày)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Giá vé câu (VNĐ) *</label>
+            <input class="form-input" id="inp-ticket-price" type="number" placeholder="150000" value="150000" min="0" step="10000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tiền cọc (VNĐ)</label>
+            <input class="form-input" id="inp-deposit" type="number" placeholder="0" value="100000" min="0" step="10000">
+          </div>
+          <div class="form-group">
+            <label>Hình thức cọc</label>
+            <select class="form-input" id="inp-deposit-type">
+              <option value="cash">Tiền mặt</option>
+              <option value="transfer">Chuyển khoản</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Gọi món ban đầu (tùy chọn)</label>
+          <select class="form-input" id="inp-initial-product">
+            <option value="">— Không gọi —</option>
+          </select>
+        </div>
+        <div class="form-row" id="initial-qty-row" style="display:none">
+          <div class="form-group">
+            <label>Số lượng</label>
+            <input class="form-input" id="inp-initial-qty" type="number" value="1" min="1">
+          </div>
+          <div class="form-group">
+            <label>Thành tiền</label>
+            <input class="form-input" id="inp-initial-total" readonly>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <input class="form-input" id="inp-notes" placeholder="VD: Khách VIP, vị trí ao số 3...">
+        </div>
+        <button class="btn-submit" onclick="createSession()">🎣 Bắt đầu ca câu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: THÊM ĐỒ ĂN ====== -->
+  <div class="modal-overlay" id="modal-add-order">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🍜 Thêm đồ ăn / nước</h2>
+        <button class="modal-close" onclick="closeModal('add-order')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Ca câu</label>
+          <input class="form-input" id="order-session-code" readonly>
+        </div>
+        <div class="form-group">
+          <label>Chọn món *</label>
+          <select class="form-input" id="order-product"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số lượng</label>
+            <input class="form-input" id="order-qty" type="number" value="1" min="1">
+          </div>
+          <div class="form-group">
+            <label>Thành tiền</label>
+            <input class="form-input" id="order-total" readonly>
+          </div>
+        </div>
+        <button class="btn-submit" onclick="addOrder()">✅ Thêm vào đơn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: THU LẠI CÁ ====== -->
+  <div class="modal-overlay" id="modal-collect-fish">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🐟 Thu lại cá</h2>
+        <button class="modal-close" onclick="closeModal('collect-fish')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Ca câu</label>
+          <input class="form-input" id="fish-session-code" readonly>
+        </div>
+        <div class="form-group">
+          <label>Loại cá *</label>
+          <select class="form-input" id="fish-type"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số kg</label>
+            <input class="form-input" id="fish-weight" type="number" step="0.1" min="0.1" value="1">
+          </div>
+          <div class="form-group">
+            <label>Thành tiền</label>
+            <input class="form-input" id="fish-total" readonly>
+          </div>
+        </div>
+        <button class="btn-submit" onclick="collectFish()">✅ Xác nhận thu cá</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: THÊM SẢN PHẨM ====== -->
+  <div class="modal-overlay" id="modal-add-product">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🍜 Thêm sản phẩm mới</h2>
+        <button class="modal-close" onclick="closeModal('add-product')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên sản phẩm *</label>
+          <input class="form-input" id="prod-name" placeholder="VD: Mì tôm, Nước suối...">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Giá bán (VNĐ) *</label>
+            <input class="form-input" id="prod-price" type="number" min="0" step="1000" placeholder="25000">
+          </div>
+          <div class="form-group">
+            <label>Phân loại</label>
+            <select class="form-input" id="prod-category">
+              <option value="food">🍜 Đồ ăn</option>
+              <option value="drink">🥤 Nước uống</option>
+              <option value="other">📦 Khác</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-submit" onclick="addProduct()">✅ Thêm sản phẩm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: QUẢN LÝ CÁ ====== -->
+  <div class="modal-overlay" id="modal-manage-fish">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🐟 Quản lý loại cá & giá thu mua</h2>
+        <button class="modal-close" onclick="closeModal('manage-fish')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên loại cá *</label>
+          <input class="form-input" id="fish-type-name" placeholder="VD: Cá chép, Cá trắm...">
+        </div>
+        <div class="form-group">
+          <label>Giá thu mua (VNĐ/kg) *</label>
+          <input class="form-input" id="fish-buyback-price" type="number" min="0" step="1000" placeholder="50000">
+        </div>
+        <button class="btn-submit" onclick="addFishType()">✅ Thêm loại cá</button>
+        <div id="fish-type-list" style="margin-top:20px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: KẾT THÚC CA ====== -->
+  <div class="modal-overlay" id="modal-finish-session">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🧾 Kết thúc ca câu</h2>
+        <button class="modal-close" onclick="closeModal('finish-session')">×</button>
+      </div>
+      <div class="modal-body" id="finish-body"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

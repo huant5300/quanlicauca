@@ -1,0 +1,9 @@
+{
+  "name": "fishing-master",
+  "version": "1.0.0",
+  "description": "Quản lý Hồ Câu - Fishing Master",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static site - no build needed'"
+  }
+}
