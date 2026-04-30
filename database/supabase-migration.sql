@@ -93,13 +93,13 @@ CREATE TABLE IF NOT EXISTS pond_stock (
 -- ============================================================
 -- INDEXES
 -- ============================================================
-CREATE INDEX idx_sessions_user ON sessions(user_id);
-CREATE INDEX idx_sessions_status ON sessions(status);
-CREATE INDEX idx_sessions_created ON sessions(created_at);
-CREATE INDEX idx_products_user ON products(user_id);
-CREATE INDEX idx_orders_session ON orders(session_id);
-CREATE INDEX idx_session_fish_session ON session_fish(session_id);
-CREATE INDEX idx_fish_buyback_user ON fish_buyback(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at);
+CREATE INDEX IF NOT EXISTS idx_products_user ON products(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_fish_session ON session_fish(session_id);
+CREATE INDEX IF NOT EXISTS idx_fish_buyback_user ON fish_buyback(user_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
@@ -114,28 +114,35 @@ ALTER TABLE session_fish ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pond_stock ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: user sees own, admin sees all
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (
   auth.uid() = id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Allow insert on signup" ON profiles;
 CREATE POLICY "Allow insert on signup" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Products: owner sees own, admin sees all
+DROP POLICY IF EXISTS "Owner manages own products" ON products;
 CREATE POLICY "Owner manages own products" ON products FOR ALL USING (
   user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
 -- Fish buyback: same pattern
+DROP POLICY IF EXISTS "Owner manages own fish types" ON fish_buyback;
 CREATE POLICY "Owner manages own fish types" ON fish_buyback FOR ALL USING (
   user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
 -- Sessions: same pattern
+DROP POLICY IF EXISTS "Owner manages own sessions" ON sessions;
 CREATE POLICY "Owner manages own sessions" ON sessions FOR ALL USING (
   user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
 -- Orders: via session ownership
+DROP POLICY IF EXISTS "Owner manages orders via session" ON orders;
 CREATE POLICY "Owner manages orders via session" ON orders FOR ALL USING (
   EXISTS (
     SELECT 1 FROM sessions s WHERE s.id = orders.session_id
@@ -144,6 +151,7 @@ CREATE POLICY "Owner manages orders via session" ON orders FOR ALL USING (
 );
 
 -- Session fish: via session ownership
+DROP POLICY IF EXISTS "Owner manages fish via session" ON session_fish;
 CREATE POLICY "Owner manages fish via session" ON session_fish FOR ALL USING (
   EXISTS (
     SELECT 1 FROM sessions s WHERE s.id = session_fish.session_id
@@ -152,6 +160,7 @@ CREATE POLICY "Owner manages fish via session" ON session_fish FOR ALL USING (
 );
 
 -- Pond stock
+DROP POLICY IF EXISTS "Owner manages own stock" ON pond_stock;
 CREATE POLICY "Owner manages own stock" ON pond_stock FOR ALL USING (
   user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
