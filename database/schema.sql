@@ -77,11 +77,13 @@ CREATE INDEX idx_fish_buyback_user ON Fish_Buyback(user_id);
 CREATE TABLE IF NOT EXISTS Sessions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     session_code    TEXT    NOT NULL UNIQUE,            -- Mã đơn (VD: CA-20260430-001)
-    user_id         INTEGER NOT NULL,                  -- Chủ hồ quản lý ca này
+    user_id         TEXT    NOT NULL,                  -- Chủ hồ quản lý ca này (đổi thành TEXT để khớp với Supabase Auth UUID)
     customer_name   TEXT    NOT NULL,                  -- Tên khách hàng
     customer_phone  TEXT,                              -- Số điện thoại khách
     start_time      TEXT    NOT NULL,                  -- Giờ bắt đầu ca câu
     end_time        TEXT,                              -- Giờ kết thúc (NULL nếu đang câu)
+    duration_min    INTEGER NOT NULL DEFAULT 120,      -- Gói giờ câu (phút)
+    ticket_price    REAL    NOT NULL DEFAULT 0,        -- Giá vé câu (VNĐ)
     deposit         REAL    NOT NULL DEFAULT 0         -- Tiền cọc (VNĐ)
                             CHECK (deposit >= 0),
     fish_weight_kg  REAL    DEFAULT 0                  -- Số kg cá thu lại
@@ -92,10 +94,9 @@ CREATE TABLE IF NOT EXISTS Sessions (
                             CHECK (status IN ('fishing', 'completed', 'cancelled')),
     notes           TEXT,                              -- Ghi chú thêm
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-
-    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
 
 CREATE INDEX idx_sessions_user ON Sessions(user_id);
 CREATE INDEX idx_sessions_status ON Sessions(status);
