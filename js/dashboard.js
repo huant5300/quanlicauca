@@ -47,8 +47,8 @@ let currentSessionId = null;
 // ============================================
 // INIT
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
-  const user = requireAuth();
+document.addEventListener('DOMContentLoaded', async () => {
+  const user = await requireAuth();
   if (!user) return;
   document.getElementById('topbar-name').textContent = user.full_name;
   const roleEl = document.getElementById('topbar-role');
@@ -408,5 +408,3 @@ function formatVND(n) { return new Intl.NumberFormat('vi-VN').format(n) + 'đ'; 
 function pad(n) { return String(n).padStart(2,'0'); }
 function fmtDateCode(d) { return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()); }
 function showToast(msg, type='success') { const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.className=`toast ${type} show`; setTimeout(()=>t.classList.remove('show'),3000); }
-function handleLogout() { localStorage.removeItem('fm_user'); showToast('Đã đăng xuất'); setTimeout(()=>window.location.href='index.html',500); }
-function requireAuth() { const u=JSON.parse(localStorage.getItem('fm_user')||'null'); if(!u){window.location.href='login.html';return null;} return u; }

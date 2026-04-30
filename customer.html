@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý khách hàng — Fishing Master</title>
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="icon" href="assets/images/logo.png" type="image/png">
+  <style>
+    .customer-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .customer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .customer-card { background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; backdrop-filter: blur(10px); }
+    .search-bar { display: flex; gap: 12px; margin-bottom: 24px; }
+    .search-input { flex: 1; }
+    .customer-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .customer-item { background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 12px; padding: 20px; transition: var(--transition); }
+    .customer-item:hover { border-color: var(--gold-500); transform: translateY(-2px); }
+    .customer-info h3 { color: var(--gold-400); margin-bottom: 4px; font-size: 1.1rem; }
+    .customer-info p { font-size: 0.85rem; color: var(--gray-400); margin-bottom: 12px; }
+    .customer-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 12px; border-top: 1px solid var(--glass-border); }
+    .stat-box { font-size: 0.75rem; }
+    .stat-label { color: var(--gray-500); display: block; margin-bottom: 2px; }
+    .stat-val { font-weight: 700; color: var(--gray-200); }
+    .btn-back { display: inline-flex; align-items: center; gap: 8px; color: var(--gray-400); text-decoration: none; font-weight: 500; margin-bottom: 24px; transition: var(--transition); font-size: 0.9rem; }
+    .btn-back:hover { color: var(--gold-400); transform: translateX(-4px); }
+    .empty-state { grid-column: 1 / -1; padding: 60px; text-align: center; color: var(--gray-500); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a href="dashboard.html" class="topbar-brand">
+      <img src="assets/images/logo.png" alt="Logo">
+      <span>FishingMaster</span>
+    </a>
+    <div class="topbar-right">
+      <div class="topbar-user">
+        <span class="user-name" id="topbar-name">—</span>
+        <span class="user-role" id="topbar-role">—</span>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="customer-container">
+    <a href="dashboard.html" class="btn-back">← Quay lại Dashboard</a>
+
+    <div class="customer-header">
+      <h1 class="section-title"><span class="icon">👥</span> Quản lý khách hàng</h1>
+      <button class="btn-submit" style="width:auto; padding: 10px 20px;" onclick="openModal('add-customer')">+ Thêm khách hàng</button>
+    </div>
+
+    <div class="customer-card">
+      <div class="search-bar">
+        <input class="form-input search-input" id="search-customer" placeholder="Tìm theo tên hoặc số điện thoại..." oninput="renderCustomers()">
+      </div>
+
+      <div class="customer-list" id="customer-list">
+        <!-- Data injected here -->
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: THÊM KHÁCH HÀNG -->
+  <div class="modal-overlay" id="modal-add-customer">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>👥 Thêm khách hàng mới</h2>
+        <button class="modal-close" onclick="closeModal('add-customer')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên khách hàng *</label>
+          <input class="form-input" id="cust-name" placeholder="VD: Anh Tuấn, Chị Lan...">
+        </div>
+        <div class="form-group">
+          <label>Số điện thoại *</label>
+          <input class="form-input" id="cust-phone" type="tel" placeholder="090...">
+        </div>
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <input class="form-input" id="cust-notes" placeholder="VD: Khách quen, thích vị trí ao số 2...">
+        </div>
+        <button class="btn-submit" onclick="addCustomer()">✅ Lưu khách hàng</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/customer.js"></script>
+</body>
+</html>

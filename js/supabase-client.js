@@ -5,10 +5,10 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const SupaDB = {
   // ---- AUTH ----
-  async signInWithGoogle() {
+  async signInWithGoogle(redirectTo) {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + '/dashboard.html' }
+      options: { redirectTo: redirectTo || window.location.origin + '/dashboard.html' }
     });
     if (error) throw error;
     return data;
