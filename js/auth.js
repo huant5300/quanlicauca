@@ -6,6 +6,13 @@
 // GOOGLE LOGIN via Supabase
 // ============================================
 async function handleGoogleLogin() {
+  // Check protocol
+  if (window.location.protocol === 'file:') {
+    showToast('Lỗi: Google Auth không hỗ trợ giao thức file://. Hãy chạy lệnh "npm run dev"!', 'error');
+    console.error("Google Auth does not work on file:// protocol. Use a local server.");
+    return;
+  }
+
   const loginButtons = document.getElementById('login-buttons');
   const loginLoading = document.getElementById('login-loading');
   if (loginButtons) loginButtons.style.display = 'none';
@@ -14,19 +21,33 @@ async function handleGoogleLogin() {
   try {
     // Determine redirect URL based on current location
     const redirectUrl = window.location.origin + '/dashboard.html';
-    console.log("Redirecting to:", redirectUrl);
+    console.log("Supabase Auth - Redirecting to:", redirectUrl);
     
     const { data, error } = await SupaDB.signInWithGoogle(redirectUrl);
-    if (error) throw error;
     
-    // In many environments, the redirect happens automatically.
-    // If not, we use the URL from the response.
+    if (error) {
+      console.error("Supabase API Error:", error);
+      throw error;
+    }
+    
     if (data && data.url) {
+      console.log("OAuth URL generated, redirecting...");
       window.location.href = data.url;
+    } else {
+      console.warn("No redirect URL returned from Supabase. Attempting manual redirect to dashboard.");
+      window.location.href = 'dashboard.html';
     }
   } catch (err) {
-    console.error("Login error:", err);
-    showToast('Lỗi đăng nhập: ' + (err.message || 'Vui lòng kiểm tra cấu hình Supabase'), 'error');
+    console.error("Login process caught error:", err);
+    let msg = 'Lỗi đăng nhập: ' + (err.message || 'Lỗi không xác định');
+    
+    if (err.message?.includes('provider')) {
+      msg = 'Lỗi: Google Provider chưa được bật trong Supabase Dashboard!';
+    } else if (err.message?.includes('redirect')) {
+      msg = 'Lỗi: Redirect URL chưa được cấu hình trong Supabase!';
+    }
+    
+    showToast(msg, 'error');
     if (loginButtons) loginButtons.style.display = '';
     if (loginLoading) loginLoading.classList.remove('active');
   }
@@ -43,6 +64,13 @@ async function checkAuth() {
       const profile = await SupaDB.getProfile(user.id);
       
       // Normalize user data to ensure it works with dashboard display
+      let role = (profile && profile.role) || 'owner';
+      
+      // Force admin role if email matches (safety check)
+      if (user.email === ADMIN_EMAIL) {
+        role = 'admin';
+      }
+
       const fullUser = {
         id: user.id,
         email: user.email,
@@ -50,7 +78,7 @@ async function checkAuth() {
                    (user.user_metadata && user.user_metadata.full_name) || 
                    (user.user_metadata && user.user_metadata.name) || 
                    user.email.split('@')[0],
-        role: (profile && profile.role) || 'owner',
+        role: role,
         is_demo: false,
         avatar_url: (user.user_metadata && user.user_metadata.avatar_url) || ''
       };

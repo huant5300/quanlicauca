@@ -105,11 +105,28 @@ const SupaDB = {
     await supabase.from('pond_stock').update({ stock_kg: newStock, updated_at: new Date().toISOString() }).eq('user_id', userId);
   },
 
+  // ---- ADMIN SPECIAL ----
+  async getAllProfiles() {
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  async getAllSessions() {
+    const { data, error } = await supabase.from('sessions').select('*, profiles(full_name, email)').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   // ---- REPORTS ----
   async getDailyReport(userId, date) {
     const start = new Date(date); start.setHours(0,0,0,0);
     const end = new Date(date); end.setHours(23,59,59,999);
-    const { data: sessions } = await supabase.from('sessions').select('*').eq('user_id', userId).gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+    
+    let q = supabase.from('sessions').select('*');
+    if (userId) q = q.eq('user_id', userId);
+    
+    const { data: sessions } = await q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+    
     if (!sessions || !sessions.length) return null;
     const sessionIds = sessions.map(s => s.id);
     const { data: allOrders } = await supabase.from('orders').select('*').in('session_id', sessionIds);

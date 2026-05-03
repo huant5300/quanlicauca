@@ -47,18 +47,174 @@ let currentSessionId = null;
 // ============================================
 // INIT
 // ============================================
+let currentUser = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = await requireAuth();
-  if (!user) return;
-  document.getElementById('topbar-name').textContent = user.full_name;
+  currentUser = await requireAuth();
+  if (!currentUser) return;
+  
+  document.getElementById('topbar-name').textContent = currentUser.full_name;
   const roleEl = document.getElementById('topbar-role');
-  roleEl.textContent = user.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
-  roleEl.className = 'user-role ' + user.role;
+  roleEl.textContent = currentUser.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
+  roleEl.className = 'user-role ' + currentUser.role;
+  
+  // Show/Hide Admin features
+  if (currentUser.role === 'admin') {
+    setupAdminUI();
+  }
+
+  await loadDataFromCloud();
+  
   populateProductSelect();
   renderAll();
   setInterval(updateAllCountdowns, 1000);
   setupModalHandlers();
 });
+
+async function loadDataFromCloud() {
+  if (currentUser.is_demo) return;
+
+  try {
+    const [prods, fish, sessions, stock] = await Promise.all([
+      SupaDB.getProducts(currentUser.id),
+      SupaDB.getFishTypes(currentUser.id),
+      SupaDB.getSessions(currentUser.id),
+      SupaDB.getPondStock(currentUser.id)
+    ]);
+
+    // Map Cloud data to local DB format for compatibility
+    DB.products = prods.map(p => ({ id: p.id, name: p.name, price: p.price, category: p.category, status: p.business_status }));
+    DB.fishTypes = fish.map(f => ({ id: f.id, name: f.fish_type, pricePerKg: f.buyback_price_per_kg, active: f.is_active }));
+    
+    // Map sessions and fetch their orders/fish
+    const mappedSessions = [];
+    for (const s of sessions) {
+      const [orders, fishItems] = await Promise.all([
+        SupaDB.getOrders(s.id),
+        SupaDB.getSessionFish(s.id)
+      ]);
+      
+      mappedSessions.push({
+        id: s.id,
+        code: s.session_code,
+        customerName: s.customer_name,
+        customerPhone: s.customer_phone,
+        startTime: s.start_time,
+        endTime: s.end_time,
+        durationMin: s.duration_min,
+        ticketPrice: s.ticket_price,
+        deposit: s.deposit,
+        fishWeightKg: s.fish_weight_kg,
+        fishBuybackTotal: s.fish_buyback_total,
+        status: s.status,
+        notes: s.notes,
+        orders: orders.map(o => ({ id: o.id, productId: o.product_id, productName: o.product_name, qty: o.quantity, unitPrice: o.unit_price, total: o.total_price, time: o.order_time })),
+        fishItems: fishItems.map(f => ({ id: f.id, fishTypeId: f.fish_buyback_id, fishName: f.fish_name, weightKg: f.weight_kg, pricePerKg: f.price_per_kg, subtotal: f.subtotal }))
+      });
+    }
+    
+    DB.sessions = mappedSessions;
+    DB.pondStock = stock;
+    DB.save();
+  } catch (err) {
+    console.error("Cloud data load failed:", err);
+    showToast('Lỗi tải dữ liệu từ Cloud!', 'error');
+  }
+}
+
+function setupAdminUI() {
+  const menu = document.querySelector('.grid-menu');
+  const adminBtn = document.createElement('button');
+  adminBtn.className = 'menu-btn admin';
+  adminBtn.style.background = 'linear-gradient(135deg, #1e293b, #0f172a)';
+  adminBtn.style.borderColor = '#334155';
+  adminBtn.style.color = '#f8fafc';
+  adminBtn.innerHTML = '<div class="menu-icon">👑</div>Quản lý Users';
+  adminBtn.onclick = openAdminPanel;
+  menu.appendChild(adminBtn);
+}
+
+async function openAdminPanel() {
+  showToast('Đang tải danh sách User...', 'info');
+  try {
+    const profiles = await SupaDB.getAllProfiles();
+    const sessions = await SupaDB.getAllSessions();
+    
+    // Create Admin Modal if not exists
+    let modal = document.getElementById('modal-admin-panel');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modal-admin-panel';
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 900px; width: 95%;">
+          <div class="modal-header">
+            <h2>👑 Bảng quản trị hệ thống</h2>
+            <button class="modal-close" onclick="closeModal('admin-panel')">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="admin-stats" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px; margin-bottom:20px;">
+              <div class="stat-card" style="background: #1e293b; padding:15px; border-radius:12px;">
+                <div style="font-size:0.8rem; opacity:0.7">Tổng số hồ</div>
+                <div style="font-size:1.5rem; font-weight:700">${profiles.length}</div>
+              </div>
+              <div class="stat-card" style="background: #1e293b; padding:15px; border-radius:12px;">
+                <div style="font-size:0.8rem; opacity:0.7">Tổng ca câu</div>
+                <div style="font-size:1.5rem; font-weight:700">${sessions.length}</div>
+              </div>
+              <div class="stat-card" style="background: #1e293b; padding:15px; border-radius:12px;">
+                <div style="font-size:0.8rem; opacity:0.7">Admin</div>
+                <div style="font-size:1.5rem; font-weight:700">1</div>
+              </div>
+            </div>
+            
+            <h3 style="margin-bottom:10px">Danh sách chủ hồ</h3>
+            <div class="user-list" style="max-height:400px; overflow-y:auto; border:1px solid #334155; border-radius:8px;">
+              <table style="width:100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="background:#1e293b; text-align:left; font-size:0.85rem">
+                    <th style="padding:12px">Chủ hồ</th>
+                    <th style="padding:12px">Email</th>
+                    <th style="padding:12px">Ngày tham gia</th>
+                    <th style="padding:12px">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-user-table">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    
+    const tableBody = document.getElementById('admin-user-table');
+    tableBody.innerHTML = profiles.map(p => `
+      <tr style="border-bottom:1px solid #334155; font-size:0.9rem">
+        <td style="padding:12px"><strong>${p.full_name}</strong> ${p.role === 'admin' ? '👑' : ''}</td>
+        <td style="padding:12px">${p.email}</td>
+        <td style="padding:12px">${new Date(p.created_at).toLocaleDateString('vi-VN')}</td>
+        <td style="padding:12px">
+          <button class="btn-session" style="padding:4px 8px; font-size:0.75rem" onclick="viewUserStats('${p.id}', '${p.full_name}')">Xem dữ liệu</button>
+        </td>
+      </tr>
+    `).join('');
+    
+    openModal('admin-panel');
+  } catch (err) {
+    showToast('Lỗi truy cập admin: ' + err.message, 'error');
+  }
+}
+
+async function viewUserStats(userId, name) {
+  showToast(`Đang tải dữ liệu của ${name}...`, 'info');
+  try {
+    const sessions = await SupaDB.getSessions(userId);
+    alert(`Chủ hồ: ${name}\nTổng số ca câu: ${sessions.length}\nEmail: ${name}\n\n(Tính năng xem chi tiết từng hồ đang được phát triển)`);
+  } catch (err) {
+    showToast('Lỗi tải dữ liệu user', 'error');
+  }
+}
 
 // ============================================
 // MODALS
