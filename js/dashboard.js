@@ -263,7 +263,7 @@ function populateFishSelect() {
 // ============================================
 // CREATE SESSION (có giá vé)
 // ============================================
-function createSession() {
+async function createSession() {
   const name = document.getElementById('inp-customer-name').value.trim();
   if (!name) { showToast('Vui lòng nhập tên khách!', 'error'); return; }
   const minutes = parseInt(document.getElementById('inp-time-package').value);
@@ -271,34 +271,88 @@ function createSession() {
   const now = new Date();
   const end = new Date(now.getTime() + minutes * 60000);
   const code = 'CA-' + fmtDateCode(now) + '-' + String(DB.sessions.length + 1).padStart(3, '0');
-  const session = {
-    id: 'ses_' + Date.now(), code, customerName: name,
-    customerPhone: document.getElementById('inp-customer-phone').value.trim(),
-    startTime: now.toISOString(), endTime: end.toISOString(), durationMin: minutes,
-    ticketPrice: ticketPrice,
+  
+  const sessionData = {
+    session_code: code,
+    user_id: currentUser.id,
+    customer_name: name,
+    customer_phone: document.getElementById('inp-customer-phone').value.trim(),
+    start_time: now.toISOString(),
+    end_time: end.toISOString(),
+    duration_min: minutes,
+    ticket_price: ticketPrice,
     deposit: parseInt(document.getElementById('inp-deposit').value || 0),
-    fishWeightKg: 0, fishBuybackTotal: 0, status: 'fishing',
+    fish_weight_kg: 0,
+    fish_buyback_total: 0,
+    status: 'fishing',
     notes: document.getElementById('inp-notes').value.trim(),
-    orders: [], fishItems: [],
   };
-  const prodId = document.getElementById('inp-initial-product').value;
-  if (prodId) {
-    const p = DB.products.find(x => x.id === prodId);
-    const qty = parseInt(document.getElementById('inp-initial-qty').value || 1);
-    session.orders.push({ id:'ord_'+Date.now(), productId:p.id, productName:p.name, qty, unitPrice:p.price, total:p.price*qty, time:now.toISOString() });
+
+  showToast('Đang tạo ca câu...', 'info');
+
+  try {
+    let cloudSession = null;
+    if (!currentUser.is_demo) {
+      cloudSession = await SupaDB.createSession(sessionData);
+    }
+
+    const localSession = {
+      id: cloudSession ? cloudSession.id : 'ses_' + Date.now(),
+      code: code,
+      customerName: sessionData.customer_name,
+      customerPhone: sessionData.customer_phone,
+      startTime: sessionData.start_time,
+      endTime: sessionData.end_time,
+      durationMin: sessionData.duration_min,
+      ticketPrice: sessionData.ticket_price,
+      deposit: sessionData.deposit,
+      fishWeightKg: 0,
+      fishBuybackTotal: 0,
+      status: 'fishing',
+      notes: sessionData.notes,
+      orders: [],
+      fishItems: [],
+    };
+
+    const prodId = document.getElementById('inp-initial-product').value;
+    if (prodId) {
+      const p = DB.products.find(x => x.id === prodId);
+      const qty = parseInt(document.getElementById('inp-initial-qty').value || 1);
+      const orderData = { id:'ord_'+Date.now(), productId:p.id, productName:p.name, qty, unitPrice:p.price, total:p.price*qty, time:now.toISOString() };
+      
+      if (!currentUser.is_demo && cloudSession) {
+        await SupaDB.addOrder({
+          session_id: cloudSession.id,
+          product_id: p.id,
+          product_name: p.name,
+          quantity: qty,
+          unit_price: p.price,
+          total_price: p.price * qty,
+          order_time: now.toISOString()
+        });
+      }
+      localSession.orders.push(orderData);
+    }
+
+    DB.sessions.push(localSession);
+    DB.save();
+    
+    // Clear form
+    document.getElementById('inp-customer-name').value='';
+    document.getElementById('inp-customer-phone').value='';
+    document.getElementById('inp-deposit').value='100000';
+    document.getElementById('inp-ticket-price').value='150000';
+    document.getElementById('inp-notes').value='';
+    document.getElementById('inp-initial-product').value='';
+    document.getElementById('initial-qty-row').style.display='none';
+    
+    closeModal('create-session');
+    showToast(`Ca ${code} đã bắt đầu! 🎣`, 'success');
+    renderAll();
+  } catch (err) {
+    console.error("Create session failed:", err);
+    showToast('Lỗi khi tạo ca câu trên Cloud!', 'error');
   }
-  DB.sessions.push(session);
-  DB.save();
-  document.getElementById('inp-customer-name').value='';
-  document.getElementById('inp-customer-phone').value='';
-  document.getElementById('inp-deposit').value='100000';
-  document.getElementById('inp-ticket-price').value='150000';
-  document.getElementById('inp-notes').value='';
-  document.getElementById('inp-initial-product').value='';
-  document.getElementById('initial-qty-row').style.display='none';
-  closeModal('create-session');
-  showToast(`Ca ${code} đã bắt đầu! 🎣`, 'success');
-  renderAll();
 }
 
 // ============================================
@@ -311,14 +365,37 @@ function openAddOrder(sid) {
   populateProductSelect(); calcOrderTotal();
   openModal('add-order');
 }
-function addOrder() {
+async function addOrder() {
   const ses = DB.sessions.find(s => s.id === currentSessionId);
   const p = DB.products.find(x => x.id === document.getElementById('order-product').value);
   if (!p) { showToast('Chọn món!','error'); return; }
   const qty = parseInt(document.getElementById('order-qty').value||1);
-  ses.orders.push({ id:'ord_'+Date.now(), productId:p.id, productName:p.name, qty, unitPrice:p.price, total:p.price*qty, time:new Date().toISOString() });
-  DB.save(); closeModal('add-order');
-  showToast(`Đã thêm ${qty}x ${p.name} ✅`, 'success'); renderAll();
+  const time = new Date().toISOString();
+  
+  showToast('Đang thêm món...', 'info');
+
+  try {
+    if (!currentUser.is_demo) {
+      await SupaDB.addOrder({
+        session_id: ses.id,
+        product_id: p.id,
+        product_name: p.name,
+        quantity: qty,
+        unit_price: p.price,
+        total_price: p.price * qty,
+        order_time: time
+      });
+    }
+
+    ses.orders.push({ id:'ord_'+Date.now(), productId:p.id, productName:p.name, qty, unitPrice:p.price, total:p.price*qty, time });
+    DB.save(); 
+    closeModal('add-order');
+    showToast(`Đã thêm ${qty}x ${p.name} ✅`, 'success'); 
+    renderAll();
+  } catch (err) {
+    console.error("Add order failed:", err);
+    showToast('Lỗi khi thêm món lên Cloud!', 'error');
+  }
 }
 
 // ============================================
@@ -331,20 +408,50 @@ function openCollectFish(sid) {
   populateFishSelect(); calcFishTotal();
   openModal('collect-fish');
 }
-function collectFish() {
+async function collectFish() {
   const ses = DB.sessions.find(s => s.id === currentSessionId);
   const f = DB.fishTypes.find(x => x.id === document.getElementById('fish-type').value);
   if (!f) { showToast('Chọn loại cá!','error'); return; }
   const w = parseFloat(document.getElementById('fish-weight').value||0);
   if (w <= 0) { showToast('Nhập số kg!','error'); return; }
-  const item = { id:'fc_'+Date.now(), fishTypeId:f.id, fishName:f.name, weightKg:w, pricePerKg:f.pricePerKg, subtotal:w*f.pricePerKg };
-  ses.fishItems.push(item);
-  ses.fishWeightKg += w;
-  ses.fishBuybackTotal += item.subtotal;
-  updateLeaderboard(ses.customerName, ses.customerPhone, w);
-  DB.pondStock = Math.max(0, DB.pondStock - w);
-  DB.save(); closeModal('collect-fish');
-  showToast(`Thu ${w}kg ${f.name} — ${formatVND(item.subtotal)} ✅`, 'success'); renderAll();
+  
+  const subtotal = w * f.pricePerKg;
+  const item = { id:'fc_'+Date.now(), fishTypeId:f.id, fishName:f.name, weightKg:w, pricePerKg:f.pricePerKg, subtotal };
+
+  showToast('Đang ghi nhận cá...', 'info');
+
+  try {
+    if (!currentUser.is_demo) {
+      await SupaDB.addSessionFish({
+        session_id: ses.id,
+        fish_buyback_id: f.id,
+        fish_name: f.name,
+        weight_kg: w,
+        price_per_kg: f.pricePerKg,
+        subtotal: subtotal
+      });
+      // Update totals on session row too
+      await SupaDB.updateSession(ses.id, {
+        fish_weight_kg: ses.fishWeightKg + w,
+        fish_buyback_total: ses.fishBuybackTotal + subtotal
+      });
+      // Update pond stock
+      await SupaDB.updatePondStock(currentUser.id, Math.max(0, DB.pondStock - w));
+    }
+
+    ses.fishItems.push(item);
+    ses.fishWeightKg += w;
+    ses.fishBuybackTotal += subtotal;
+    updateLeaderboard(ses.customerName, ses.customerPhone, w);
+    DB.pondStock = Math.max(0, DB.pondStock - w);
+    DB.save(); 
+    closeModal('collect-fish');
+    showToast(`Thu ${w}kg ${f.name} — ${formatVND(subtotal)} ✅`, 'success'); 
+    renderAll();
+  } catch (err) {
+    console.error("Collect fish failed:", err);
+    showToast('Lỗi khi ghi nhận cá lên Cloud!', 'error');
+  }
 }
 
 // ============================================
@@ -406,22 +513,59 @@ function openFinishSession(sid) {
   openModal('finish-session');
 }
 
-function finishSession() {
+async function finishSession() {
   const ses = DB.sessions.find(s => s.id === currentSessionId);
   if (!ses) return;
-  ses.status = 'completed'; ses.endTime = new Date().toISOString();
-  DB.save(); closeModal('finish-session');
-  showToast(`Ca ${ses.code} hoàn thành! ✅`, 'success'); renderAll();
+  const now = new Date().toISOString();
+  
+  showToast('Đang kết thúc ca...', 'info');
+
+  try {
+    if (!currentUser.is_demo) {
+      await SupaDB.updateSession(ses.id, {
+        status: 'completed',
+        end_time: now
+      });
+    }
+
+    ses.status = 'completed'; 
+    ses.endTime = now;
+    DB.save(); 
+    closeModal('finish-session');
+    showToast(`Ca ${ses.code} hoàn thành! ✅`, 'success'); 
+    renderAll();
+  } catch (err) {
+    console.error("Finish session failed:", err);
+    showToast('Lỗi khi kết thúc ca trên Cloud!', 'error');
+  }
 }
 
-function finishAndPrint() {
+async function finishAndPrint() {
   const ses = DB.sessions.find(s => s.id === currentSessionId);
   if (!ses) return;
-  ses.status = 'completed'; ses.endTime = new Date().toISOString();
-  DB.save();
-  printBill();
-  closeModal('finish-session');
-  showToast(`Ca ${ses.code} hoàn thành & đã in bill! 🖨️`, 'success'); renderAll();
+  const now = new Date().toISOString();
+
+  showToast('Đang kết thúc & chuẩn bị in...', 'info');
+
+  try {
+    if (!currentUser.is_demo) {
+      await SupaDB.updateSession(ses.id, {
+        status: 'completed',
+        end_time: now
+      });
+    }
+
+    ses.status = 'completed'; 
+    ses.endTime = now;
+    DB.save();
+    printBill();
+    closeModal('finish-session');
+    showToast(`Ca ${ses.code} hoàn thành & đã in bill! 🖨️`, 'success'); 
+    renderAll();
+  } catch (err) {
+    console.error("Finish and print failed:", err);
+    showToast('Lỗi khi kết thúc ca trên Cloud!', 'error');
+  }
 }
 
 function printBill() {
@@ -456,22 +600,62 @@ function printBill() {
 // ============================================
 // PRODUCTS & FISH TYPES
 // ============================================
-function addProduct() {
+async function addProduct() {
   const name = document.getElementById('prod-name').value.trim();
   const price = parseInt(document.getElementById('prod-price').value||0);
+  const category = document.getElementById('prod-category').value;
   if (!name || price <= 0) { showToast('Nhập đầy đủ!','error'); return; }
-  DB.products.push({ id:'p'+Date.now(), name, price, category:document.getElementById('prod-category').value, status:'active' });
-  DB.save(); document.getElementById('prod-name').value=''; document.getElementById('prod-price').value='';
-  populateProductSelect(); closeModal('add-product');
-  showToast(`Đã thêm "${name}" ✅`, 'success');
+  
+  showToast('Đang thêm sản phẩm...', 'info');
+
+  try {
+    let cloudProd = null;
+    if (!currentUser.is_demo) {
+      cloudProd = await SupaDB.addProduct(currentUser.id, name, price, category);
+    }
+
+    DB.products.push({ 
+      id: cloudProd ? cloudProd.id : 'p'+Date.now(), 
+      name, price, category, status:'active' 
+    });
+    DB.save(); 
+    document.getElementById('prod-name').value=''; 
+    document.getElementById('prod-price').value='';
+    populateProductSelect(); 
+    closeModal('add-product');
+    showToast(`Đã thêm "${name}" ✅`, 'success');
+  } catch (err) {
+    console.error("Add product failed:", err);
+    showToast('Lỗi khi thêm sản phẩm lên Cloud!', 'error');
+  }
 }
-function addFishType() {
+
+async function addFishType() {
   const name = document.getElementById('fish-type-name').value.trim();
   const price = parseInt(document.getElementById('fish-buyback-price').value||0);
   if (!name || price <= 0) { showToast('Nhập đầy đủ!','error'); return; }
-  DB.fishTypes.push({id:'f'+Date.now(), name, pricePerKg:price, active:true});
-  DB.save(); document.getElementById('fish-type-name').value=''; document.getElementById('fish-buyback-price').value='';
-  renderFishTypeList(); showToast(`Đã thêm "${name}" ✅`, 'success');
+
+  showToast('Đang thêm loại cá...', 'info');
+
+  try {
+    let cloudFish = null;
+    if (!currentUser.is_demo) {
+      cloudFish = await SupaDB.addFishType(currentUser.id, name, price);
+    }
+
+    DB.fishTypes.push({
+      id: cloudFish ? cloudFish.id : 'f'+Date.now(), 
+      name, pricePerKg:price, active:true
+    });
+    DB.save(); 
+    document.getElementById('fish-type-name').value=''; 
+    document.getElementById('fish-buyback-price').value='';
+    renderFishTypeList(); 
+    showToast(`Đã thêm "${name}" ✅`, 'success');
+  } catch (err) {
+    console.error("Add fish type failed:", err);
+    showToast('Lỗi khi thêm loại cá lên Cloud!', 'error');
+  }
 }
 function renderFishTypeList() {
   const el = document.getElementById('fish-type-list');

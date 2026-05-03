@@ -2,19 +2,38 @@
 // CUSTOMER — Data & Logic
 // ============================================
 
-let customers = JSON.parse(localStorage.getItem('fm_customers') || '[]');
+let customers = [];
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = await requireAuth();
-  if (!user) return;
+  currentUser = await requireAuth();
+  if (!currentUser) return;
   
-  document.getElementById('topbar-name').textContent = user.full_name;
+  document.getElementById('topbar-name').textContent = currentUser.full_name;
   const roleEl = document.getElementById('topbar-role');
-  roleEl.textContent = user.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
-  roleEl.className = 'user-role ' + user.role;
+  roleEl.textContent = currentUser.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
+  roleEl.className = 'user-role ' + currentUser.role;
   
+  await loadCustomers();
   renderCustomers();
 });
+
+async function loadCustomers() {
+  if (currentUser.is_demo) {
+    customers = JSON.parse(localStorage.getItem('fm_customers') || '[]');
+    return;
+  }
+
+  showToast('Đang tải khách hàng...', 'info');
+  try {
+    customers = await SupaDB.getCustomers(currentUser.id);
+    localStorage.setItem('fm_customers', JSON.stringify(customers));
+  } catch (err) {
+    console.error("Load customers failed:", err);
+    showToast('Lỗi tải khách hàng từ Cloud!', 'error');
+    customers = JSON.parse(localStorage.getItem('fm_customers') || '[]');
+  }
+}
 
 function renderCustomers() {
   const list = document.getElementById('customer-list');
@@ -22,7 +41,7 @@ function renderCustomers() {
   
   const filtered = customers.filter(c => 
     c.name.toLowerCase().includes(query) || 
-    c.phone.includes(query)
+    (c.phone && c.phone.includes(query))
   );
   
   if (!filtered.length) {
@@ -32,7 +51,7 @@ function renderCustomers() {
     return;
   }
   
-  // Get sessions to count frequency (optional optimization)
+  // Get sessions to count frequency
   const sessions = JSON.parse(localStorage.getItem('fm_sessions') || '[]');
   
   list.innerHTML = filtered.map(c => {
@@ -43,8 +62,8 @@ function renderCustomers() {
       <div class="customer-item">
         <div class="customer-info">
           <h3>${c.name}</h3>
-          <p>📞 ${c.phone}</p>
-          <p style="font-size: 0.75rem; font-style: italic;">${c.notes || 'Không có ghi chú'}</p>
+          <p>📞 ${c.phone || 'N/A'}</p>
+          <p style="font-size: 0.75rem; font-style: italic; color: var(--gray-400)">${c.notes || 'Không có ghi chú'}</p>
         </div>
         <div class="customer-stats">
           <div class="stat-box">
@@ -61,48 +80,67 @@ function renderCustomers() {
   }).join('');
 }
 
-function addCustomer() {
+async function addCustomer() {
   const name = document.getElementById('cust-name').value.trim();
   const phone = document.getElementById('cust-phone').value.trim();
   const notes = document.getElementById('cust-notes').value.trim();
   
-  if (!name || !phone) {
-    showToast('Vui lòng nhập tên và số điện thoại!', 'error');
+  if (!name) {
+    showToast('Vui lòng nhập tên khách hàng!', 'error');
     return;
   }
   
-  const exists = customers.find(c => c.phone === phone);
+  const exists = customers.find(c => phone && c.phone === phone);
   if (exists) {
     showToast('Số điện thoại này đã tồn tại!', 'error');
     return;
   }
+
+  showToast('Đang lưu khách hàng...', 'info');
   
-  const newCust = {
-    id: 'cust_' + Date.now(),
-    name,
-    phone,
-    notes,
-    createdAt: new Date().toISOString()
-  };
-  
-  customers.push(newCust);
-  localStorage.setItem('fm_customers', JSON.stringify(customers));
-  
-  document.getElementById('cust-name').value = '';
-  document.getElementById('cust-phone').value = '';
-  document.getElementById('cust-notes').value = '';
-  
-  closeModal('add-customer');
-  showToast('Đã thêm khách hàng thành công!', 'success');
-  renderCustomers();
+  try {
+    let cloudCust = null;
+    if (!currentUser.is_demo) {
+      cloudCust = await SupaDB.addCustomer(currentUser.id, name, phone, notes);
+    }
+
+    const newCust = {
+      id: cloudCust ? cloudCust.id : 'cust_' + Date.now(),
+      name,
+      phone,
+      notes,
+      createdAt: new Date().toISOString()
+    };
+    
+    customers.push(newCust);
+    localStorage.setItem('fm_customers', JSON.stringify(customers));
+    
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-phone').value = '';
+    document.getElementById('cust-notes').value = '';
+    
+    closeModal('add-customer');
+    showToast('Đã thêm khách hàng thành công!', 'success');
+    renderCustomers();
+  } catch (err) {
+    console.error("Add customer failed:", err);
+    showToast('Lỗi khi thêm khách hàng lên Cloud!', 'error');
+  }
 }
 
 function openModal(n) { document.getElementById('modal-' + n).classList.add('active'); }
 function closeModal(n) { document.getElementById('modal-' + n).classList.remove('active'); }
 
-// Close modal on overlay click
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('active');
   }
 });
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}

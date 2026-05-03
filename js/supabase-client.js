@@ -105,6 +105,17 @@ const SupaDB = {
     await supabase.from('pond_stock').update({ stock_kg: newStock, updated_at: new Date().toISOString() }).eq('user_id', userId);
   },
 
+  // ---- CUSTOMERS ----
+  async getCustomers(userId) {
+    const { data } = await supabase.from('customers').select('*').eq('user_id', userId).order('name');
+    return data || [];
+  },
+  async addCustomer(userId, name, phone, notes) {
+    const { data, error } = await supabase.from('customers').insert({ user_id: userId, name, phone, notes }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
   // ---- ADMIN SPECIAL ----
   async getAllProfiles() {
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });

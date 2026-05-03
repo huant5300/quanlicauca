@@ -1,25 +1,59 @@
 // ============================================
 // REPORT — Business Logic
 // ============================================
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = await requireAuth();
-  if (!user) return;
+  currentUser = await requireAuth();
+  if (!currentUser) return;
   
-  document.getElementById('topbar-name').textContent = user.full_name;
+  document.getElementById('topbar-name').textContent = currentUser.full_name;
   const roleEl = document.getElementById('topbar-role');
-  roleEl.textContent = user.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
-  roleEl.className = 'user-role ' + user.role;
+  roleEl.textContent = currentUser.role === 'admin' ? '👑 Admin' : '🎣 Chủ hồ';
+  roleEl.className = 'user-role ' + currentUser.role;
   
   document.getElementById('report-date').textContent = new Date().toLocaleDateString('vi-VN');
   
-  renderReport();
+  await renderReport();
 });
 
-function renderReport() {
-  const sessions = JSON.parse(localStorage.getItem('fm_sessions') || '[]');
+async function renderReport() {
+  let sessions = [];
+  
+  if (currentUser.is_demo) {
+    sessions = JSON.parse(localStorage.getItem('fm_sessions') || '[]');
+  } else {
+    showToast('Đang tải báo cáo...', 'info');
+    try {
+      const reportData = await SupaDB.getDailyReport(currentUser.id, new Date());
+      if (reportData) {
+        // Map cloud report to local format
+        sessions = reportData.sessions.map(s => {
+          const sOrders = reportData.orders.filter(o => o.session_id === s.id);
+          const sFish = reportData.fish.filter(f => f.session_id === s.id);
+          
+          return {
+            ...s,
+            code: s.session_code,
+            customerName: s.customer_name,
+            ticketPrice: s.ticket_price,
+            fishBuybackTotal: s.fish_buyback_total,
+            fishWeightKg: s.fish_weight_kg,
+            orders: sOrders.map(o => ({ total: o.total_price })),
+            fishItems: sFish
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Report fetch failed:", err);
+      showToast('Lỗi tải báo cáo từ Cloud!', 'error');
+      // Fallback to local
+      sessions = JSON.parse(localStorage.getItem('fm_sessions') || '[]');
+    }
+  }
+
   const today = new Date().toDateString();
-  const todaySessions = sessions.filter(s => new Date(s.startTime).toDateString() === today);
+  const todaySessions = sessions.filter(s => new Date(s.startTime || s.start_time).toDateString() === today);
   
   let totalRevenue = 0;
   let totalExpense = 0;
@@ -32,7 +66,7 @@ function renderReport() {
   }
   
   tbody.innerHTML = todaySessions.map(ses => {
-    const revenue = (ses.ticketPrice || 0) + ses.orders.reduce((sum, o) => sum + o.total, 0);
+    const revenue = (ses.ticketPrice || 0) + (ses.orders ? ses.orders.reduce((sum, o) => sum + o.total, 0) : 0);
     const expense = ses.fishBuybackTotal || 0;
     
     totalRevenue += revenue;
@@ -43,7 +77,7 @@ function renderReport() {
       <tr>
         <td><strong>${ses.code}</strong></td>
         <td>${ses.customerName}</td>
-        <td>${new Date(ses.startTime).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'})}</td>
+        <td>${new Date(ses.startTime || ses.start_time).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'})}</td>
         <td style="color:var(--green-600);font-weight:600">${formatVND(revenue)}</td>
         <td style="color:var(--red-600)">${formatVND(expense)}</td>
         <td><span class="tag-completed">${ses.status === 'completed' ? 'Hoàn thành' : 'Đang câu'}</span></td>
@@ -59,4 +93,12 @@ function renderReport() {
 
 function formatVND(n) {
   return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
 }

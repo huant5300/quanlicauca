@@ -90,6 +90,18 @@ CREATE TABLE IF NOT EXISTS pond_stock (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 8. CUSTOMERS
+CREATE TABLE IF NOT EXISTS customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_user_phone ON customers(user_id, phone);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -162,6 +174,13 @@ CREATE POLICY "Owner manages fish via session" ON session_fish FOR ALL USING (
 -- Pond stock
 DROP POLICY IF EXISTS "Owner manages own stock" ON pond_stock;
 CREATE POLICY "Owner manages own stock" ON pond_stock FOR ALL USING (
+  user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- Customers
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner manages own customers" ON customers;
+CREATE POLICY "Owner manages own customers" ON customers FOR ALL USING (
   user_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
