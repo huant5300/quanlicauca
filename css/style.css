@@ -287,15 +287,35 @@ body {
 }
 .login-card .logo-wrap h1 .highlight { color: var(--orange-500); }
 .login-card .subtitle {
-  color: var(--gray-400); font-size: 0.95rem; margin-bottom: 36px;
+  color: var(--gray-400); font-size: 0.95rem; margin-bottom: 20px;
 }
-.login-divider {
-  display: flex; align-items: center; gap: 16px; margin: 28px 0;
-  color: var(--gray-500); font-size: 0.85rem;
+
+/* Support text & Badge on Login */
+.support-text {
+  margin-bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
-.login-divider::before, .login-divider::after {
-  content: ''; flex: 1; height: 1px; background: var(--glass-border);
+.support-text p {
+  font-size: 0.95rem;
+  color: var(--gray-300);
+  font-weight: 500;
 }
+.support-text .badge {
+  background: linear-gradient(135deg, var(--orange-500), var(--orange-600));
+  color: var(--white);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: var(--shadow-orange);
+  animation: float 3s ease-in-out infinite;
+}
+
 .login-card .back-link {
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--gray-400); text-decoration: none; font-size: 0.9rem;
