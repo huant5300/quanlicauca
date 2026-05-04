@@ -351,7 +351,8 @@ async function createSession() {
     renderAll();
   } catch (err) {
     console.error("Create session failed:", err);
-    showToast('Lỗi khi tạo ca câu trên Cloud!', 'error');
+    const errorMsg = err.message || err.details || 'Lỗi không xác định';
+    showToast('Lỗi Cloud: ' + errorMsg, 'error');
   }
 }
 
@@ -394,7 +395,8 @@ async function addOrder() {
     renderAll();
   } catch (err) {
     console.error("Add order failed:", err);
-    showToast('Lỗi khi thêm món lên Cloud!', 'error');
+    const errorMsg = err.message || err.details || 'Lỗi không xác định';
+    showToast('Lỗi Cloud: ' + errorMsg, 'error');
   }
 }
 
@@ -450,7 +452,8 @@ async function collectFish() {
     renderAll();
   } catch (err) {
     console.error("Collect fish failed:", err);
-    showToast('Lỗi khi ghi nhận cá lên Cloud!', 'error');
+    const errorMsg = err.message || err.details || 'Lỗi không xác định';
+    showToast('Lỗi Cloud: ' + errorMsg, 'error');
   }
 }
 
@@ -626,7 +629,8 @@ async function addProduct() {
     showToast(`Đã thêm "${name}" ✅`, 'success');
   } catch (err) {
     console.error("Add product failed:", err);
-    showToast('Lỗi khi thêm sản phẩm lên Cloud!', 'error');
+    const errorMsg = err.message || err.details || 'Lỗi không xác định';
+    showToast('Lỗi Cloud: ' + errorMsg, 'error');
   }
 }
 
@@ -654,7 +658,8 @@ async function addFishType() {
     showToast(`Đã thêm "${name}" ✅`, 'success');
   } catch (err) {
     console.error("Add fish type failed:", err);
-    showToast('Lỗi khi thêm loại cá lên Cloud!', 'error');
+    const errorMsg = err.message || err.details || 'Lỗi không xác định';
+    showToast('Lỗi Cloud: ' + errorMsg, 'error');
   }
 }
 function renderFishTypeList() {

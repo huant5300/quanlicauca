@@ -82,6 +82,23 @@ async function checkAuth() {
         is_demo: false,
         avatar_url: (user.user_metadata && user.user_metadata.avatar_url) || ''
       };
+
+      // SELF-HEALING: If profile missing in DB, create it now
+      if (!profile) {
+        console.log("Auth - Profile missing, creating self-healing profile...");
+        try {
+          await SupaDB.createProfile({
+            id: fullUser.id,
+            email: fullUser.email,
+            full_name: fullUser.full_name,
+            role: fullUser.role
+          });
+          await SupaDB.initializePondStock(fullUser.id);
+          console.log("Auth - Self-healing profile created successfully.");
+        } catch (dbErr) {
+          console.error("Auth - Self-healing failed (check RLS policies):", dbErr);
+        }
+      }
       
       localStorage.setItem('fm_user', JSON.stringify(fullUser));
       return fullUser;

@@ -24,6 +24,16 @@ const SupaDB = {
     const { data } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
     return data;
   },
+  async createProfile(profile) {
+    const { data, error } = await supabaseClient.from('profiles').insert(profile).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async initializePondStock(userId) {
+    const { data, error } = await supabaseClient.from('pond_stock').insert({ user_id: userId, stock_kg: 500 }).select().single();
+    if (error) return null; // Might already exist
+    return data;
+  },
   onAuthChange(callback) {
     supabaseClient.auth.onAuthStateChange(callback);
   },
